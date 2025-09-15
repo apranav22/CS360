@@ -1,3 +1,7 @@
 Resources
 .DS_Store
 .vscode
+,prettierrc
+.editorconfig
+.eslintrc.json
+jsconfig.json
