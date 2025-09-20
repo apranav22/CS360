@@ -5,3 +5,6 @@ Resources
 .editorconfig
 .eslintrc.json
 jsconfig.json
+.github
+.jsconfig.json
+.gitattributes
