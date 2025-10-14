@@ -1,6 +1,6 @@
 Resources
 .DS_Store
-.vscode
+/.vscode
 ,prettierrc
 .editorconfig
 .eslintrc.json
