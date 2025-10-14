@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////
 var gl;
 var canvas;
 var matrixStack = [];
@@ -7,6 +7,7 @@ var zAngle = 0.0;
 var yAngle = 0.0;
 var prevMouseX = 0.0;
 var prevMouseY = 0.0;
+
 var aPositionLocation;
 var aTexCoordLocation;
 var uVMatrixLocation;
@@ -70,6 +71,21 @@ var pKSpecularLocation;
 var pEnvMapLocation;
 var pReflectionMixLocation;
 
+// Globe shader (textured + specular)
+var globeShaderProgram;
+var gPositionLocation;
+var gNormalLocation;
+var gTexCoordLocation;
+var gMMatrixLocation;
+var gVMatrixLocation;
+var gPMatrixLocation;
+var gNormalMatrixLocation;
+var gLightPosLocation;
+var gEyePosLocation;
+var gTextureLocation;
+var gSpecStrengthLocation;
+var gShininessLocation;
+
 // Plane buffers (simple quad in XZ plane at Y = 0)
 var planePositionBuffer;
 var planeTexCoordBuffer;
@@ -87,6 +103,7 @@ var sbTextureLocation;
 var sbUseTextureLocation;
 var sbFlipYLocation;
 var sbFlipXLocation;
+
 // Skybox faces
 var skyboxTextures = {
   posx: null,
@@ -119,6 +136,10 @@ var eyePos = [0.0, 3.0, 9.0]; // camera/eye position
 var xCam = 0;
 var yCam = 0;
 var zCam = 0;
+
+var sphereLightPos = [5.0, 5.0, 5.0];
+var globeSpecularStrength = 0.45;
+var globeShininess = 48.0;
 
 //////////////////////////////////////////////////////////////////////////
 const vertexShaderCode = `#version 300 es
@@ -157,6 +178,61 @@ void main() {
   } else {
     fragColor = diffuseTerm;
   }
+}`;
+
+// Textured globe shader with phong specular highlight
+const globeVertexShaderCode = `#version 300 es
+in vec3 aPosition;
+in vec3 aNormal;
+in vec2 aTexCoords;
+
+uniform mat4 uMMatrix;
+uniform mat4 uVMatrix;
+uniform mat4 uPMatrix;
+uniform mat3 uNormalMatrix;
+
+out vec3 vWorldPos;
+out vec3 vNormal;
+out vec2 vTexCoords;
+
+void main() {
+  vec4 worldPos = uMMatrix * vec4(aPosition, 1.0);
+  vWorldPos = worldPos.xyz;
+  vNormal = normalize(uNormalMatrix * aNormal);
+  vTexCoords = aTexCoords;
+  gl_Position = uPMatrix * uVMatrix * worldPos;
+}`;
+
+const globeFragShaderCode = `#version 300 es
+precision highp float;
+
+in vec3 vWorldPos;
+in vec3 vNormal;
+in vec2 vTexCoords;
+
+uniform vec3 uLightPos;
+uniform vec3 uEyePos;
+uniform sampler2D uTexture;
+uniform float uSpecularStrength;
+uniform float uShininess;
+
+out vec4 fragColor;
+
+void main() {
+  vec3 baseColor = texture(uTexture, vTexCoords).rgb;
+  vec3 N = normalize(vNormal);
+  vec3 L = normalize(uLightPos - vWorldPos);
+  vec3 V = normalize(uEyePos - vWorldPos);
+  float NdotL = max(dot(N, L), 0.0);
+  vec3 R = reflect(-L, N);
+  float spec = 0.0;
+  if (NdotL > 0.0) {
+    spec = pow(max(dot(R, V), 0.0), 16.0);
+  }
+
+  vec3 lighting = baseColor + uSpecularStrength * spec * vec3(1.0);
+  lighting = clamp(lighting, 0.0, 1.0);
+  fragColor = vec4(lighting, 1.0);
 }`;
 
 // --- Reflective teapot shaders (environment mapping using skybox cube map) ---
@@ -210,10 +286,10 @@ void main(){
   if(useTexture){
     vec4 texColor = texture(imageTexture, vTex);
     // Discard fragment if alpha is below threshold
-    if(texColor.a < 0.2){
+    if(texColor.a < 0.1) {
       discard;
     }
-    fragColor = texColor;
+    fragColor = vec4(texColor.rgb, 1.0); 
   } else {
     fragColor = diffuseTerm;
   }
@@ -342,7 +418,7 @@ void main() {
   vec3 R = normalize(-reflect(L, N));
 
   float diffuse = max(dot(N, L), 0.0);
-  float specular = pow(max(dot(R, V), 0.0), 32.0);
+  float specular = pow(max(dot(R, V), 0.0), 16.0);
   float ambient = 0.15;
 
   // Phong shading
@@ -499,6 +575,42 @@ function initSkyboxShaders() {
   );
   sbFlipYLocation = gl.getUniformLocation(skyboxShaderProgram, "flipY");
   sbFlipXLocation = gl.getUniformLocation(skyboxShaderProgram, "flipX");
+}
+
+function initGlobeShaders() {
+  globeShaderProgram = gl.createProgram();
+  var vsh = vertexShaderSetup(globeVertexShaderCode);
+  var fsh = fragmentShaderSetup(globeFragShaderCode);
+  gl.attachShader(globeShaderProgram, vsh);
+  gl.attachShader(globeShaderProgram, fsh);
+  gl.linkProgram(globeShaderProgram);
+  if (!gl.getProgramParameter(globeShaderProgram, gl.LINK_STATUS)) {
+    console.log(gl.getShaderInfoLog(vsh));
+    console.log(gl.getShaderInfoLog(fsh));
+  }
+
+  gPositionLocation = gl.getAttribLocation(globeShaderProgram, "aPosition");
+  gNormalLocation = gl.getAttribLocation(globeShaderProgram, "aNormal");
+  gTexCoordLocation = gl.getAttribLocation(globeShaderProgram, "aTexCoords");
+
+  gMMatrixLocation = gl.getUniformLocation(globeShaderProgram, "uMMatrix");
+  gVMatrixLocation = gl.getUniformLocation(globeShaderProgram, "uVMatrix");
+  gPMatrixLocation = gl.getUniformLocation(globeShaderProgram, "uPMatrix");
+  gNormalMatrixLocation = gl.getUniformLocation(
+    globeShaderProgram,
+    "uNormalMatrix",
+  );
+  gLightPosLocation = gl.getUniformLocation(globeShaderProgram, "uLightPos");
+  gEyePosLocation = gl.getUniformLocation(globeShaderProgram, "uEyePos");
+  gTextureLocation = gl.getUniformLocation(globeShaderProgram, "uTexture");
+  gSpecStrengthLocation = gl.getUniformLocation(
+    globeShaderProgram,
+    "uSpecularStrength",
+  );
+  gShininessLocation = gl.getUniformLocation(
+    globeShaderProgram,
+    "uShininess",
+  );
 }
 
 function initRefractiveCubeShaders() {
@@ -1346,21 +1458,82 @@ function drawSkybox() {
   mMatrix = popMatrix(matrixStack);
 }
 
-// Helper to draw the textured sphere "globe". Binds shaderProgram explicitly for now.
+// Helper to draw the textured sphere "globe" with specular highlights.
 function drawGlobe() {
-  gl.useProgram(shaderProgram);
+  if (!sampleTexture || !globeShaderProgram) return;
+
+  var prevProgram = gl.getParameter(gl.CURRENT_PROGRAM);
+  gl.useProgram(globeShaderProgram);
+
   pushMatrix(matrixStack, mMatrix);
   mMatrix = mat4.scale(mMatrix, [1.2, 1.2, 1.2]);
-  bindSphereGeometry();
-  gl.uniformMatrix4fv(uMMatrixLocation, false, mMatrix);
-  gl.uniformMatrix4fv(uVMatrixLocation, false, vMatrix);
-  gl.uniformMatrix4fv(uPMatrixLocation, false, pMatrix);
+
+  if (typeof gPositionLocation === "number" && gPositionLocation !== -1) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, spBuf);
+    gl.enableVertexAttribArray(gPositionLocation);
+    gl.vertexAttribPointer(
+      gPositionLocation,
+      spBuf.itemSize,
+      gl.FLOAT,
+      false,
+      0,
+      0,
+    );
+  }
+
+  if (typeof gNormalLocation === "number" && gNormalLocation !== -1) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, spNormalBuf);
+    gl.enableVertexAttribArray(gNormalLocation);
+    gl.vertexAttribPointer(
+      gNormalLocation,
+      spNormalBuf.itemSize,
+      gl.FLOAT,
+      false,
+      0,
+      0,
+    );
+  }
+
+  if (typeof gTexCoordLocation === "number" && gTexCoordLocation !== -1) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, spTexBuf);
+    gl.enableVertexAttribArray(gTexCoordLocation);
+    gl.vertexAttribPointer(
+      gTexCoordLocation,
+      spTexBuf.itemSize,
+      gl.FLOAT,
+      false,
+      0,
+      0,
+    );
+  }
+
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, spIndexBuf);
+
+  if (gMMatrixLocation) gl.uniformMatrix4fv(gMMatrixLocation, false, mMatrix);
+  if (gVMatrixLocation) gl.uniformMatrix4fv(gVMatrixLocation, false, vMatrix);
+  if (gPMatrixLocation) gl.uniformMatrix4fv(gPMatrixLocation, false, pMatrix);
+
+  var normalMatrix = mat3.create();
+  mat4.toInverseMat3(mMatrix, normalMatrix);
+  mat3.transpose(normalMatrix);
+  if (gNormalMatrixLocation)
+    gl.uniformMatrix3fv(gNormalMatrixLocation, false, normalMatrix);
+
+  if (gLightPosLocation) gl.uniform3fv(gLightPosLocation, sphereLightPos);
+  if (gEyePosLocation) gl.uniform3fv(gEyePosLocation, eyePos);
+  if (gSpecStrengthLocation)
+    gl.uniform1f(gSpecStrengthLocation, globeSpecularStrength);
+  if (gShininessLocation)
+    gl.uniform1f(gShininessLocation, globeShininess);
+
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, sampleTexture);
-  gl.uniform1i(uTextureLocation, 0);
-  gl.uniform1i(uUseTextureLocation, 1);
-  drawSphere();
+  if (gTextureLocation) gl.uniform1i(gTextureLocation, 0);
+
+  gl.drawElements(gl.TRIANGLES, spIndexBuf.numItems, gl.UNSIGNED_INT, 0);
+
   mMatrix = popMatrix(matrixStack);
+  gl.useProgram(prevProgram);
 }
 
 // Draw four wooden legs around the table center using the cube shader.
@@ -1453,14 +1626,15 @@ function drawScene() {
 
   drawSkybox();
   pushMatrix(matrixStack, mMatrix);
-  mMatrix = mat4.translate(mMatrix, [1.5, 0, 2]);
+  mMatrix = mat4.translate(mMatrix, [1.5, -0.4, 2]);
+  mMatrix = mat4.scale(mMatrix, [0.7, 0.7, 0.7]);
   drawGlobe();
   mMatrix = popMatrix(matrixStack);
 
   if (teapotLoaded) {
     pushMatrix(matrixStack, mMatrix);
-    mMatrix = mat4.translate(mMatrix, [-1, 0, 0.0]);
-    mMatrix = mat4.scale(mMatrix, [0.12, 0.12, 0.12]);
+    mMatrix = mat4.translate(mMatrix, [-1.5, 0.5, 0.0]);
+    mMatrix = mat4.scale(mMatrix, [0.2, 0.2, 0.2]);
     drawTeapot();
     mMatrix = popMatrix(matrixStack);
   }
@@ -1471,7 +1645,7 @@ function drawScene() {
 
   // draw textured (or colored) cubes
   pushMatrix(matrixStack, mMatrix);
-  mMatrix = mat4.translate(mMatrix, [2.5, -0.3, -0.5]);
+  mMatrix = mat4.translate(mMatrix, [2.5, -0.1, -0.5]);
   mMatrix = mat4.scale(mMatrix, [1.8, 1.8, 1.8]);
   gl.uniformMatrix4fv(cUMatrixLocation, false, mMatrix);
   gl.uniform1i(cUseTextureLocation, 1);
@@ -1484,11 +1658,10 @@ function drawScene() {
 
   pushMatrix(matrixStack, mMatrix);
   mMatrix = mat4.translate(mMatrix, [2.5, -0.3, -0.5]);
-  mMatrix = mat4.scale(mMatrix, [0.8, 0.8, 0.8]);
-  var blueColor = [0.2, 0.4, 0.8];
-  var lightPos = [5.0, 5.0, 5.0];
-  var reflectionMix = 0.4;
-  drawPhongSphere(blueColor, lightPos, reflectionMix);
+  mMatrix = mat4.scale(mMatrix, [0.6, 0.6, 0.6]);
+  var blueColor = [0.0, 0.0, 0.4];
+  var reflectionMix = 0.6;
+  drawPhongSphere(blueColor, sphereLightPos, reflectionMix);
   mMatrix = popMatrix(matrixStack);
 
   pushMatrix(matrixStack, mMatrix);
@@ -1580,6 +1753,7 @@ function webGLStart() {
   initTeapotShaders();
   initCubeShaders();
   initSkyboxShaders();
+  initGlobeShaders();
   initRefractiveCubeShaders();
   initPhongShaders();
 
