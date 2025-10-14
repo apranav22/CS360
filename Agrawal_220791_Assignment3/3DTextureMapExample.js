@@ -140,6 +140,8 @@ var zCam = 0;
 var sphereLightPos = [5.0, 5.0, 5.0];
 var globeSpecularStrength = 0.45;
 var globeShininess = 48.0;
+var teapotSpecularStrength = 0.6;
+var teapotShininess = 4.0;
 
 //////////////////////////////////////////////////////////////////////////
 const vertexShaderCode = `#version 300 es
@@ -245,21 +247,39 @@ uniform mat4 uPMatrix;
 uniform mat3 uNormalMatrix;
 uniform vec3 uEyePos;
 out vec3 vReflectDir;
+out vec3 vWorldPos;
+out vec3 vNormal;
 void main(){
   vec3 worldPos = (uMMatrix * vec4(aPosition,1.0)).xyz;
   vec3 N = normalize(uNormalMatrix * aNormal);
   vec3 I = normalize(worldPos - uEyePos);
   vReflectDir = reflect(I, N);
+  vWorldPos = worldPos;
+  vNormal = N;
   gl_Position = uPMatrix * uVMatrix * vec4(worldPos,1.0);
 }`;
 
 const teapotFragShaderCode = `#version 300 es
 precision highp float;
 in vec3 vReflectDir;
+in vec3 vWorldPos;
+in vec3 vNormal;
 out vec4 fragColor;
 uniform samplerCube uEnvMap;
+uniform vec3 uLightPos;
+uniform vec3 uEyePos;
+uniform float uSpecularStrength;
+uniform float uShininess;
 void main(){
-  fragColor = texture(uEnvMap, vReflectDir);
+  vec3 envColor = texture(uEnvMap, vReflectDir).rgb;
+  vec3 N = normalize(vNormal);
+  vec3 L = normalize(uLightPos - vWorldPos);
+  vec3 V = normalize(uEyePos - vWorldPos);
+  vec3 R = reflect(-L, N);
+  float spec = pow(max(dot(R, V), 0.0), 8.0);
+  vec3 color = envColor + 1.0 * spec * vec3(1.0);
+  color = clamp(color, 0.0, 1.0);
+  fragColor = vec4(color, 1.0);
 }`;
 
 // Cube shaders (solid color, translation only applied externally)
@@ -442,6 +462,9 @@ var tUVMatrixLocation;
 var tNormalMatrixLocation;
 var tEyePosLocation;
 var tEnvMapLocation;
+var tLightPosLocation;
+var tSpecStrengthLocation;
+var tShininessLocation;
 
 function pushMatrix(stack, m) {
   //necessary because javascript only does shallow push
@@ -525,6 +548,18 @@ function initTeapotShaders() {
   );
   tEyePosLocation = gl.getUniformLocation(teapotShaderProgram, "uEyePos");
   tEnvMapLocation = gl.getUniformLocation(teapotShaderProgram, "uEnvMap");
+  tLightPosLocation = gl.getUniformLocation(
+    teapotShaderProgram,
+    "uLightPos",
+  );
+  tSpecStrengthLocation = gl.getUniformLocation(
+    teapotShaderProgram,
+    "uSpecularStrength",
+  );
+  tShininessLocation = gl.getUniformLocation(
+    teapotShaderProgram,
+    "uShininess",
+  );
 }
 
 function initCubeShaders() {
@@ -1135,6 +1170,10 @@ function drawTeapot() {
   gl.uniformMatrix3fv(tNormalMatrixLocation, false, normalMatrix);
 
   gl.uniform3fv(tEyePosLocation, eyePos);
+  if (tLightPosLocation) gl.uniform3fv(tLightPosLocation, sphereLightPos);
+  if (tSpecStrengthLocation)
+    gl.uniform1f(tSpecStrengthLocation, teapotSpecularStrength);
+  if (tShininessLocation) gl.uniform1f(tShininessLocation, teapotShininess);
 
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_CUBE_MAP, envCubeMap);
