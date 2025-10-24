@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <title>WebGL 3D Texture Mapping Example</title>
+    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1" />
+    <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+    <script type="text/javascript" src="main.js"></script>
+  </head>
+
+  <body onload="webGLStart();">
+  <canvas
+    id="3DTextureMapExample"
+    style="border: none"
+    width="500"
+    height="500"
+  ></canvas>
+
+  <div style="margin-top: 10px;">
+    <label for="lightSlider">Control Light Position:</label>
+    <input type="range" id="lightSlider" min="-20" max="20" step="0.2" value="0" />
+    <br />
+    <label for="animate">Animate</label>
+    <input type="checkbox" id="animate" />
+  </div>
+
+  <script>
+    const lightSlider = document.getElementById('lightSlider');
+    const animateCheckbox = document.getElementById('animate');
+
+    // Callbacks expected to exist in main.js
+    lightSlider.addEventListener('input', () => {
+      if (typeof setLightPosition === 'function') {
+        setLightPosition(parseFloat(lightSlider.value));
+      }
+    });
+
+    animateCheckbox.addEventListener('change', () => {
+      if (typeof toggleAnimation === 'function') {
+        toggleAnimation(animateCheckbox.checked);
+      }
+    });
+  </script>
+</body>
+
+</html>
