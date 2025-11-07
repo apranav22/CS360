@@ -229,7 +229,7 @@ void main() {
   vec3 R = reflect(-L, N);
   float spec = 0.0;
   if (NdotL > 0.0) {
-    spec = pow(max(dot(R, V), 0.0), 16.0);
+    spec = pow(max(dot(R, V), 0.0), 64.0);
   }
 
   vec3 lighting = baseColor + uSpecularStrength * spec * vec3(1.0);
@@ -475,6 +475,34 @@ function pushMatrix(stack, m) {
 function popMatrix(stack) {
   if (stack.length > 0) return stack.pop();
   else console.log("stack has no matrix to pop!");
+}
+
+// ==============================
+// Refactored Helper Functions
+// ==============================
+
+// Bind buffer and set up vertex attribute pointer
+function bindAttribute(location, buffer, itemSize) {
+  if (typeof location === "number" && location !== -1 && buffer) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(location);
+    gl.vertexAttribPointer(location, itemSize, gl.FLOAT, false, 0, 0);
+  }
+}
+
+// Compute and return normal matrix from model matrix
+function computeNormalMatrix(modelMatrix) {
+  var normalMatrix = mat3.create();
+  mat4.toInverseMat3(modelMatrix, normalMatrix);
+  mat3.transpose(normalMatrix);
+  return normalMatrix;
+}
+
+// Set MVP matrices for a shader program
+function setMVPUniforms(mLoc, vLoc, pLoc) {
+  if (mLoc) gl.uniformMatrix4fv(mLoc, false, mMatrix);
+  if (vLoc) gl.uniformMatrix4fv(vLoc, false, vMatrix);
+  if (pLoc) gl.uniformMatrix4fv(pLoc, false, pMatrix);
 }
 
 function vertexShaderSetup(vertexShaderCode) {
@@ -1136,38 +1164,12 @@ function drawTeapot() {
 
   gl.useProgram(teapotShaderProgram);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
-  gl.enableVertexAttribArray(tPositionLocation);
-  gl.vertexAttribPointer(
-    tPositionLocation,
-    teapotVertexPositionBuffer.itemSize,
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
-  gl.enableVertexAttribArray(tNormalLocation);
-  gl.vertexAttribPointer(
-    tNormalLocation,
-    teapotVertexNormalBuffer.itemSize,
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
-
+  bindAttribute(tPositionLocation, teapotVertexPositionBuffer, 3);
+  bindAttribute(tNormalLocation, teapotVertexNormalBuffer, 3);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, teapotVertexIndexBuffer);
 
-  gl.uniformMatrix4fv(tUMMatrixLocation, false, mMatrix);
-  gl.uniformMatrix4fv(tUVMatrixLocation, false, vMatrix);
-  gl.uniformMatrix4fv(tUPMatrixLocation, false, pMatrix);
-
-  var normalMatrix = mat3.create();
-  mat4.toInverseMat3(mMatrix, normalMatrix);
-  mat3.transpose(normalMatrix);
-  gl.uniformMatrix3fv(tNormalMatrixLocation, false, normalMatrix);
+  setMVPUniforms(tUMMatrixLocation, tUVMatrixLocation, tUPMatrixLocation);
+  gl.uniformMatrix3fv(tNormalMatrixLocation, false, computeNormalMatrix(mMatrix));
 
   gl.uniform3fv(tEyePosLocation, eyePos);
   if (tLightPosLocation) gl.uniform3fv(tLightPosLocation, sphereLightPos);
@@ -1197,34 +1199,8 @@ function drawCube() {
 
 function bindCubeGeometry() {
   if (!cubePositionBuffer) return;
-  gl.bindBuffer(gl.ARRAY_BUFFER, cubePositionBuffer);
-  if (typeof cPositionLocation === "number" && cPositionLocation !== -1) {
-    gl.enableVertexAttribArray(cPositionLocation);
-    gl.vertexAttribPointer(
-      cPositionLocation,
-      cubePositionBuffer.itemSize,
-      gl.FLOAT,
-      false,
-      0,
-      0,
-    );
-  }
-  if (
-    cubeTexCoordBuffer &&
-    typeof cTexCoordLocation === "number" &&
-    cTexCoordLocation !== -1
-  ) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, cubeTexCoordBuffer);
-    gl.enableVertexAttribArray(cTexCoordLocation);
-    gl.vertexAttribPointer(
-      cTexCoordLocation,
-      cubeTexCoordBuffer.itemSize,
-      gl.FLOAT,
-      false,
-      0,
-      0,
-    );
-  }
+  bindAttribute(cPositionLocation, cubePositionBuffer, 3);
+  bindAttribute(cTexCoordLocation, cubeTexCoordBuffer, 2);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
 }
 
@@ -1233,38 +1209,12 @@ function drawRefractiveCube() {
 
   gl.useProgram(refractiveCubeShaderProgram);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, cubePositionBuffer);
-  gl.enableVertexAttribArray(rcPositionLocation);
-  gl.vertexAttribPointer(
-    rcPositionLocation,
-    cubePositionBuffer.itemSize,
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, cubeNormalBuffer);
-  gl.enableVertexAttribArray(rcNormalLocation);
-  gl.vertexAttribPointer(
-    rcNormalLocation,
-    cubeNormalBuffer.itemSize,
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
-
+  bindAttribute(rcPositionLocation, cubePositionBuffer, 3);
+  bindAttribute(rcNormalLocation, cubeNormalBuffer, 3);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
 
-  gl.uniformMatrix4fv(rcUMMatrixLocation, false, mMatrix);
-  gl.uniformMatrix4fv(rcUVMatrixLocation, false, vMatrix);
-  gl.uniformMatrix4fv(rcUPMatrixLocation, false, pMatrix);
-
-  var normalMatrix = mat3.create();
-  mat4.toInverseMat3(mMatrix, normalMatrix);
-  mat3.transpose(normalMatrix);
-  gl.uniformMatrix3fv(rcNormalMatrixLocation, false, normalMatrix);
+  setMVPUniforms(rcUMMatrixLocation, rcUVMatrixLocation, rcUPMatrixLocation);
+  gl.uniformMatrix3fv(rcNormalMatrixLocation, false, computeNormalMatrix(mMatrix));
 
   gl.uniform3fv(rcEyePosLocation, eyePos);
   gl.uniform1f(rcRefractiveIndexLocation, 1.52);
@@ -1281,38 +1231,12 @@ function drawPhongSphere(color, lightPos, reflectionMix) {
 
   gl.useProgram(phongShaderProgram);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, spBuf);
-  gl.enableVertexAttribArray(pPositionLocation);
-  gl.vertexAttribPointer(
-    pPositionLocation,
-    spBuf.itemSize,
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, spNormalBuf);
-  gl.enableVertexAttribArray(pNormalLocation);
-  gl.vertexAttribPointer(
-    pNormalLocation,
-    spNormalBuf.itemSize,
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
-
+  bindAttribute(pPositionLocation, spBuf, spBuf.itemSize);
+  bindAttribute(pNormalLocation, spNormalBuf, spNormalBuf.itemSize);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, spIndexBuf);
 
-  gl.uniformMatrix4fv(pModelLocation, false, mMatrix);
-  gl.uniformMatrix4fv(pViewLocation, false, vMatrix);
-  gl.uniformMatrix4fv(pProjLocation, false, pMatrix);
-
-  var normalMatrix = mat3.create();
-  mat4.toInverseMat3(mMatrix, normalMatrix);
-  mat3.transpose(normalMatrix);
-  gl.uniformMatrix3fv(pNormalMatrixLocation, false, normalMatrix);
+  setMVPUniforms(pModelLocation, pViewLocation, pProjLocation);
+  gl.uniformMatrix3fv(pNormalMatrixLocation, false, computeNormalMatrix(mMatrix));
 
   gl.uniform3fv(pEyePosLocation, eyePos);
   gl.uniform3fv(pLightPosLocation, lightPos);
@@ -1333,34 +1257,14 @@ function drawPlane(material) {
   var prevProgram = gl.getParameter(gl.CURRENT_PROGRAM);
   gl.useProgram(skyboxShaderProgram);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, planePositionBuffer);
-  gl.enableVertexAttribArray(sbPositionLocation);
-  gl.vertexAttribPointer(
-    sbPositionLocation,
-    planePositionBuffer.itemSize,
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
+  bindAttribute(sbPositionLocation, planePositionBuffer, planePositionBuffer.itemSize);
 
   if (sbTexCoordLocation !== -1 && planeTexCoordBuffer) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, planeTexCoordBuffer);
-    gl.enableVertexAttribArray(sbTexCoordLocation);
-    gl.vertexAttribPointer(
-      sbTexCoordLocation,
-      planeTexCoordBuffer.itemSize,
-      gl.FLOAT,
-      false,
-      0,
-      0,
-    );
+    bindAttribute(sbTexCoordLocation, planeTexCoordBuffer, planeTexCoordBuffer.itemSize);
   }
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, planeIndexBuffer);
 
-  gl.uniformMatrix4fv(sbUMatrixLocation, false, mMatrix);
-  gl.uniformMatrix4fv(sbVMatrixLocation, false, vMatrix);
-  gl.uniformMatrix4fv(sbPMatrixLocation, false, pMatrix);
+  setMVPUniforms(sbUMatrixLocation, sbVMatrixLocation, sbPMatrixLocation);
 
   var useTex = 0;
   var color = [0.6, 0.75, 0.95, 1.0]; // default
@@ -1508,55 +1412,23 @@ function drawGlobe() {
   mMatrix = mat4.scale(mMatrix, [1.2, 1.2, 1.2]);
 
   if (typeof gPositionLocation === "number" && gPositionLocation !== -1) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, spBuf);
-    gl.enableVertexAttribArray(gPositionLocation);
-    gl.vertexAttribPointer(
-      gPositionLocation,
-      spBuf.itemSize,
-      gl.FLOAT,
-      false,
-      0,
-      0,
-    );
+    bindAttribute(gPositionLocation, spBuf, spBuf.itemSize);
   }
 
   if (typeof gNormalLocation === "number" && gNormalLocation !== -1) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, spNormalBuf);
-    gl.enableVertexAttribArray(gNormalLocation);
-    gl.vertexAttribPointer(
-      gNormalLocation,
-      spNormalBuf.itemSize,
-      gl.FLOAT,
-      false,
-      0,
-      0,
-    );
+    bindAttribute(gNormalLocation, spNormalBuf, spNormalBuf.itemSize);
   }
 
   if (typeof gTexCoordLocation === "number" && gTexCoordLocation !== -1) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, spTexBuf);
-    gl.enableVertexAttribArray(gTexCoordLocation);
-    gl.vertexAttribPointer(
-      gTexCoordLocation,
-      spTexBuf.itemSize,
-      gl.FLOAT,
-      false,
-      0,
-      0,
-    );
+    bindAttribute(gTexCoordLocation, spTexBuf, spTexBuf.itemSize);
   }
 
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, spIndexBuf);
 
-  if (gMMatrixLocation) gl.uniformMatrix4fv(gMMatrixLocation, false, mMatrix);
-  if (gVMatrixLocation) gl.uniformMatrix4fv(gVMatrixLocation, false, vMatrix);
-  if (gPMatrixLocation) gl.uniformMatrix4fv(gPMatrixLocation, false, pMatrix);
+  setMVPUniforms(gMMatrixLocation, gVMatrixLocation, gPMatrixLocation);
 
-  var normalMatrix = mat3.create();
-  mat4.toInverseMat3(mMatrix, normalMatrix);
-  mat3.transpose(normalMatrix);
   if (gNormalMatrixLocation)
-    gl.uniformMatrix3fv(gNormalMatrixLocation, false, normalMatrix);
+    gl.uniformMatrix3fv(gNormalMatrixLocation, false, computeNormalMatrix(mMatrix));
 
   if (gLightPosLocation) gl.uniform3fv(gLightPosLocation, sphereLightPos);
   if (gEyePosLocation) gl.uniform3fv(gEyePosLocation, eyePos);
@@ -1665,14 +1537,14 @@ function drawScene() {
 
   drawSkybox();
   pushMatrix(matrixStack, mMatrix);
-  mMatrix = mat4.translate(mMatrix, [1.5, -0.4, 2]);
+  mMatrix = mat4.translate(mMatrix, [1.5, -0.3, 2]);
   mMatrix = mat4.scale(mMatrix, [0.7, 0.7, 0.7]);
   drawGlobe();
   mMatrix = popMatrix(matrixStack);
 
   if (teapotLoaded) {
     pushMatrix(matrixStack, mMatrix);
-    mMatrix = mat4.translate(mMatrix, [-1.5, 0.5, 0.0]);
+    mMatrix = mat4.translate(mMatrix, [-1.5, 0.4, 0.0]);
     mMatrix = mat4.scale(mMatrix, [0.2, 0.2, 0.2]);
     drawTeapot();
     mMatrix = popMatrix(matrixStack);
@@ -1704,7 +1576,7 @@ function drawScene() {
   mMatrix = popMatrix(matrixStack);
 
   pushMatrix(matrixStack, mMatrix);
-  mMatrix = mat4.translate(mMatrix, [-1, 0.0, 3.0]);
+  mMatrix = mat4.translate(mMatrix, [-1, -0.1, 3.0]);
   mMatrix = mat4.scale(mMatrix, [1, 2, 0.1]);
   drawRefractiveCube();
   mMatrix = popMatrix(matrixStack);

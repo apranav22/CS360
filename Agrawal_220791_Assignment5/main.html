@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Assignment 5: Ray Tracer</title>
+    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+    <script type="text/javascript" src="main.js"></script>
+</head>
+<body onload="webGLStart();">
+    <!-- Canvas for ray tracer -->
+    <canvas id="rayTracerCanvas" width="500" height="500" style="border: 1px solid #000;"></canvas>
+    
+    <br>
+    
+    <!-- Shading Mode Controls -->
+    <div>
+        <strong>Shading Mode:</strong>
+        <br>
+        <button>Phong</button>
+        <button>Phong+Reflection</button>
+        <button>Phong+Shadow</button>
+        <button>Phong+Shadow+Reflection</button>
+    </div>
+    
+    <br>
+    
+    <!-- Light Position Control -->
+    <div>
+        <strong>Move Light:</strong>
+        <input type="range" id="lightSlider" min="-10" max="10" step="0.1" value="0">
+    </div>
+</body>
+</html>

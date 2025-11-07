@@ -48,7 +48,7 @@ var uSpecularStrengthLocation;
 var uShininessLocation;
 var aNormalLocation;
 
-var eyePos = [9.0, 4.0, 0.0]; // camera/eye position
+var eyePos = [12.0, 6.0, -1.0]; // camera/eye position
 var xCam = 0;
 var yCam = 0;
 var zCam = 0;
@@ -746,8 +746,10 @@ function drawScene() {
   mat4.identity(rotationMatrix);
 
   // Apply rotations: first rotate around Y axis (horizontal), then X axis (vertical)
-  mat4.rotate(rotationMatrix, degToRad(zAngle), [0, 1, 0], rotationMatrix);
-  mat4.rotate(rotationMatrix, degToRad(yAngle), [1, 0, 0], rotationMatrix);
+  // Use the same mat4.rotate signature used across the repo which returns
+  // the rotated matrix. Assign the result back to rotationMatrix.
+  rotationMatrix = mat4.rotate(rotationMatrix, degToRad(zAngle), [0, 1, 0]);
+  rotationMatrix = mat4.rotate(rotationMatrix, degToRad(yAngle), [1, 0, 0]);
 
   // Transform the initial eye position by the rotation matrix
   var currentEyePos = [
