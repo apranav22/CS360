@@ -1,7 +1,9 @@
-# CS360 Project Portfolio
+# CS360 Project
 
 > **Featured highlight:** Built a custom **ray tracer** to render scene color through ray-scene intersection logic, expanding from rasterization into physically motivated rendering.
-[Demo](https://github.com/user-attachments/assets/54218929-7ce5-45ba-8578-c686c549d55a)
+
+![Demo](https://github.com/user-attachments/assets/54218929-7ce5-45ba-8578-c686c549d55a)
+
 This repository contains five WebGL/JS projects completed in IITK's CS360, an introductory course in Computer Graphics.  
 
 ## Repository
